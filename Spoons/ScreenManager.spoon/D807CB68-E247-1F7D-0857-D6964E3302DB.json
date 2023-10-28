@@ -1,0 +1,13 @@
+{
+  "notes": [
+    "Tokyo LG 4k",
+    "const LEFT_THIRD = [0, 0, 1200, 1666];",
+    "const CENTER_THIRD = [1201, 0, 1205, 1666];",
+    "const RIGHT_THIRD = [2407, 0, 600, 1666];"
+  ],
+  "D807CB68-E247-1F7D-0857-D6964E3302DB": {
+    "Google Chrome": [0, 0, 1200, 1666],
+    "iTerm2": [2407, 0, 600, 1666],
+    "Code": [1201, 0, 1205, 1666],
+  }
+}

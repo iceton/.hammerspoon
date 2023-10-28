@@ -1,0 +1,3 @@
+eye rest
+countdown
+darken screen for rest
