@@ -52,11 +52,12 @@ function obj:update_fetch_time(url)
   obj.fetch_times[url] = hs.timer.secondsSinceEpoch()
 end
 
+-- make less opaque if earliest fetch time isn't recent
 function obj:get_alpha()
   local now = hs.timer.secondsSinceEpoch()
   local earliest = now
-  for k, v in pairs(obj.fetch_times) do
-    if earliest > v then earliest = v end
+  for _url, time in pairs(obj.fetch_times) do
+    if earliest > time then earliest = time end
   end
   local is_current = now - earliest < 60 * 10
   return (is_current and 0.9) or 0.3
@@ -107,7 +108,6 @@ function obj:refresh_data()
       end
     end
   )
-  obj:update_menubar()
 end
 
 function obj:start(config)

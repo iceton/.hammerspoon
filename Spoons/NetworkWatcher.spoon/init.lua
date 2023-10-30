@@ -9,7 +9,7 @@ local LOW_ALPHA = 0.3
 local obj = {
   prev_menubar_data = {},
   prev_trace = NIL_TRACE,
-  use_dhcp_dns = false,
+  use_dhcp_dns = nil,
 }
 
 local logger = hs.logger.new('NetWatcher', 'debug')
@@ -29,8 +29,8 @@ end
 
 function obj:update_menubar()
   local menubar_data = obj:menubar_data()
+  -- rerender only if data has changed
   if hs.json.encode(menubar_data) ~= hs.json.encode(obj.prev_menubar_data) then
-    -- logger.d(menubar_data.menu_1_title)
     obj:render_menubar(menubar_data)
   end
 end
@@ -122,14 +122,15 @@ function obj:is_external_dns()
   return found ~= nil
 end
 
-function obj:check_external_dns_accessible(upgrade)
+function obj:check_external_dns_accessible()
+  -- logger.d('check_external_dns_accessible')
   --'/usr/bin/dig @1.1.1.1 +retry=0 +short +time=1 google.com; echo $?'
   hs.task.new(
     '/usr/bin/dig',
     function(exit_code, stdout, stderr)
       local is_external_dns_accessible = exit_code == 0
       -- logger.d(obj.is_external_dns_accessible)
-      if not obj.use_dhcp_dns then
+      if obj.use_dhcp_dns ~= true then
         if not is_external_dns_accessible then
           hs.notify.new({
             title = 'Switching to DHCP DNS',
@@ -137,7 +138,7 @@ function obj:check_external_dns_accessible(upgrade)
             withdrawAfter = 10
           }):send()
           obj:toggle_dhcp_dns()
-        elseif upgrade then
+        elseif obj.use_dhcp_dns == nil then
           obj:set_external_dns()
         end
       end
@@ -164,9 +165,9 @@ function obj:set_external_dns(force)
   end
 end
 
-function obj:is_network_reachable(status)
-  status = status or hs.network.reachability.internet():status()
-  return status >= MINIMUM_REACHABLE_FLAG
+function obj:is_network_reachable(reach_status)
+  -- logger.d(reach_status)
+  return reach_status >= MINIMUM_REACHABLE_FLAG
 end
 
 function obj:refresh_trace()
@@ -195,23 +196,17 @@ function obj:refresh_trace()
   )
 end
 
-function obj:reachability_callback(reach_obj, flags)
-  reach_obj = reach_obj or hs.network.reachability.internet()
-  -- logger.d(reach_obj)
-  if obj:is_network_reachable(reach_obj:status()) then
-    obj.trace_timer = hs.timer.doEvery(10, obj.refresh_trace)
-  else
-    if obj.trace_timer then obj.trace_timer:stop() end
-  end
+function obj:reach_callback(reach_obj, flags)
+  local method = (obj:is_network_reachable(reach_obj) and 'start') or 'stop'
+  obj.dns_timer[method](obj.dns_timer) --:fire()
+  obj.trace_timer[method](obj.trace_timer) --:fire()
 end
 
 function obj:start()
-  obj:check_external_dns_accessible(true)
-  obj:refresh_trace()
-  obj.dns_timer = hs.timer.doEvery(10, obj.check_external_dns_accessible)
-  obj.trace_timer = hs.timer.doEvery(10, obj.refresh_trace)
-  -- obj.reachability = hs.network.reachability.internet():setCallback(obj.reachability_callback):start()
-  -- obj:reachability_callback()
+  obj.dns_timer = hs.timer.new(10, obj.check_external_dns_accessible)
+  obj.trace_timer = hs.timer.new(10, obj.refresh_trace)
+  obj.reach_listener = hs.network.reachability.internet():setCallback(obj.reach_callback):start()
+  obj:reach_callback(hs.network.reachability.internet():status())
 end
 
 return obj
