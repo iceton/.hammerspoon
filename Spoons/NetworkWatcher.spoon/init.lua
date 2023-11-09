@@ -9,7 +9,7 @@ local LOW_ALPHA = 0.3
 local obj = {
   prev_menubar_data = {},
   prev_trace = NIL_TRACE,
-  use_dhcp_dns = nil,
+  use_dhcp_dns = true, -- prev nil to allow ext upgrade, now true because tailscale dns more or less overrides this
 }
 
 local logger = hs.logger.new('NetWatcher', 'debug')
@@ -94,13 +94,14 @@ function obj:toggle_dhcp_dns()
 end
 
 function obj:notify(trace)
+  local prev_trace = obj.prev_trace
   local text = string.format(
     "%s %s » %s %s\n%s » %s",
-    obj.prev_trace.loc,
-    obj.prev_trace.colo,
+    prev_trace.loc,
+    prev_trace.colo,
     trace.loc,
     trace.colo,
-    obj.prev_trace.ip,
+    prev_trace.ip,
     trace.ip
   )
   local notification = hs.notify.new({
@@ -108,12 +109,14 @@ function obj:notify(trace)
     informativeText = text,
     withdrawAfter = 10
   })
-  local alert_text = string.format(
-    "%s » %s",
-    obj.prev_trace.loc,
-    trace.loc
-  )
-  hs.alert.show(alert_text, nil, nil, 3)
+  if trace.loc ~= prev_trace.loc then
+    local alert_text = string.format(
+      "%s » %s",
+      prev_trace.loc,
+      trace.loc
+    )
+    hs.alert.show(alert_text, nil, nil, 3)
+  end
   notification:send()
 end
 
@@ -171,6 +174,22 @@ function obj:is_network_reachable(reach_status)
   return reach_status >= MINIMUM_REACHABLE_FLAG
 end
 
+-- compare first 4 parts of ip to ignore local ipv6 changes
+function obj:is_ip_similar(str1, str2)
+  if str1 == str2 then return true end
+  if not str1 or not str2 then return false end
+  local common_str = ""
+  for i = 1, #str1 do
+    if str1:sub(i, i) ~= str2:sub(i, i) then
+      common_str = str1:sub(1, i - 1)
+      break
+    end
+  end
+  local t = {}
+  for hex in string.gmatch(common_str, "%x+") do table.insert(t, hex) end
+  return #t >= 4
+end
+
 function obj:refresh_trace()
   -- use curl because asyncget sometimes uses a different route than the user
   hs.task.new(
@@ -186,7 +205,7 @@ function obj:refresh_trace()
       else
         trace = NIL_TRACE
       end
-      if (trace.ip ~= obj.prev_trace.ip or trace.loc ~= obj.prev_trace.loc) then
+      if not obj:is_ip_similar(trace.ip, obj.prev_trace.ip) or trace.loc ~= obj.prev_trace.loc then
         obj:notify(trace)
       end
       obj.prev_trace = trace
