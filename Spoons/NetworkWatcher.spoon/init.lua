@@ -20,7 +20,7 @@ function obj:menubar_data()
   menubar_data = {
     canvas_text_1 = string.format("%s", trace.loc or '✕'),
     canvas_text_2 = obj:is_external_dns() and 'EXT' or 'DHCP',
-    menu_1_title = string.format("IP %s %s", trace.ip, trace.colo),
+    menu_1_ip = trace.ip,
     menu_2_title = string.format("DNS %s", obj:get_dns_server()),
     menu_3_checked = obj.use_dhcp_dns == true,
   }
@@ -69,8 +69,9 @@ function obj:render_menubar(menubar_data)
   -- https://www.gitmemory.com/issue/Hammerspoon/hammerspoon/2741/792564885
   local canvas = nil
 
+  local ip = menubar_data.menu_1_ip
   menubar:setMenu({
-    { title = menubar_data.menu_1_title, disabled = true },
+    { title = string.format("IP %s %s", ip, obj.prev_trace.colo), fn = function() hs.pasteboard.setContents(ip) end },
     { title = menubar_data.menu_2_title, disabled = true },
     { title = "Use DHCP DNS", checked = menubar_data.menu_3_checked, fn = function() obj:toggle_dhcp_dns() end },
   })
@@ -171,15 +172,13 @@ function obj:is_network_reachable(reach_status)
 end
 
 function obj:refresh_trace()
-  -- logger.d('refresh_trace')
-  hs.http.asyncGet(
-    'https://cloudflare.com/cdn-cgi/trace',
-    nil,
-    function(status, body_str, headers)
-      -- logger.d(status)
+  -- use curl because asyncget sometimes uses a different route than the user
+  hs.task.new(
+    '/usr/bin/curl',
+    function(exit_code, stdout, stderr)
       local trace = {}
-      if (status == 200) then
-        local lines = hs.fnutils.split(body_str, "\n")
+      if exit_code == 0 then
+        local lines = hs.fnutils.split(stdout, "\n")
         for line_no, line in ipairs(lines) do
           local kv = hs.fnutils.split(line, "=")
           if (kv[1]) then trace[kv[1]] = kv[2] end
@@ -192,17 +191,23 @@ function obj:refresh_trace()
       end
       obj.prev_trace = trace
       obj:update_menubar()
-    end
-  )
+    end,
+    { '-f', 'https://cloudflare.com/cdn-cgi/trace' }
+  ):start()
 end
 
 function obj:reach_callback(reach_obj, flags)
-  local method = (obj:is_network_reachable(reach_obj) and 'start') or 'stop'
-  obj.dns_timer[method](obj.dns_timer) --:fire()
-  obj.trace_timer[method](obj.trace_timer) --:fire()
+  if obj:is_network_reachable(reach_obj) then
+    obj.dns_timer:start():fire()
+    obj.trace_timer:start():fire()
+  else
+    obj.dns_timer:stop()
+    obj.trace_timer:stop()
+  end
 end
 
 function obj:start()
+  obj.update_menubar()
   obj.dns_timer = hs.timer.new(10, obj.check_external_dns_accessible)
   obj.trace_timer = hs.timer.new(10, obj.refresh_trace)
   obj.reach_listener = hs.network.reachability.internet():setCallback(obj.reach_callback):start()
