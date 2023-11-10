@@ -1,9 +1,11 @@
+local FONT_NAME = 'SFMono-Regular'
+local MONOSPACE = { font = { name = FONT_NAME, size = 12 } }
+
 local obj = {}
 
 -- use logger.d("log message")
 local logger = hs.logger.new('CryptoMenu', 'debug')
 local menubar = hs.menubar.new()
-local monospace = { font = { name = 'SFMono-Regular', size = 12 } }
 
 local eth_gas_url = 'https://api.etherscan.io/api?module=gastracker&action=gasoracle&apikey='
 local eth_price_url = 'https://api.etherscan.io/api?module=stats&action=ethprice&apikey='
@@ -25,11 +27,11 @@ function obj:update_menubar()
   local canvas = hs.canvas.new(rect)
   local st1 = hs.styledtext.new(
     string.format("%.0f %.0f\n", obj.eth_usd, obj.btc_usd),
-    { font = { name = 'SFMono-Regular', size = 9 }, color = { alpha = alpha, white = 1 }, paragraphStyle = { alignment = "left", lineBreak = "clip", maximumLineHeight = 12 } }
+    { font = { name = FONT_NAME, size = 9 }, color = { alpha = alpha, white = 1 }, paragraphStyle = { alignment = "left", lineBreak = "clip", maximumLineHeight = 12 } }
   )
   local canvas_text = getmetatable(st1).__concat(st1, hs.styledtext.new(
     string.format("%.05f %s", obj.ldo_eth, obj.gas_med):sub(2),
-    { font = { name = 'SFMono-Regular', size = 9 }, color = { alpha = alpha, white = 1 }, paragraphStyle = { alignment = "left", lineBreak = "clip", maximumLineHeight = 10 } }
+    { font = { name = FONT_NAME, size = 9 }, color = { alpha = alpha, white = 1 }, paragraphStyle = { alignment = "left", lineBreak = "clip", maximumLineHeight = 10 } }
   ))
   canvas[1] = {
     text = canvas_text,
@@ -40,12 +42,12 @@ function obj:update_menubar()
   canvas = nil
   local gas = string.format("%s %s %s", obj.gas_low, obj.gas_med, obj.gas_hi)
   menubar:setMenu({
-    { title = hs.styledtext.new(string.format("BTC% 9.02f", obj.btc_usd), monospace), fn = function() hs.urlevent.openURL('https://www.google.com/finance/quote/BTC-USD?window=5D') end },
-    { title = hs.styledtext.new(string.format("ETH% 9.02f", obj.eth_usd), monospace), fn = function() hs.urlevent.openURL('https://www.google.com/finance/quote/ETH-USD?window=5D') end },
-    { title = hs.styledtext.new(string.format("LDO% 9.02f", obj.ldo_usd), monospace), fn = function() hs.urlevent.openURL('https://www.coingecko.com/en/coins/lido-dao') end },
+    { title = hs.styledtext.new(string.format("BTC% 9.02f", obj.btc_usd), MONOSPACE), fn = function() hs.urlevent.openURL('https://www.google.com/finance/quote/BTC-USD?window=5D') end },
+    { title = hs.styledtext.new(string.format("ETH% 9.02f", obj.eth_usd), MONOSPACE), fn = function() hs.urlevent.openURL('https://www.google.com/finance/quote/ETH-USD?window=5D') end },
+    { title = hs.styledtext.new(string.format("LDO% 9.02f", obj.ldo_usd), MONOSPACE), fn = function() hs.urlevent.openURL('https://www.coingecko.com/en/coins/lido-dao') end },
     { title = '-' },
-    { title = hs.styledtext.new(gas, monospace), fn = function() hs.urlevent.openURL('https://etherscan.io/gastracker') end },
-    { title = hs.styledtext.new(string.format("%.05f", obj.eth_btc), monospace), fn = function() hs.urlevent.openURL('https://livdir.com/ethgaspricechart/') end },
+    { title = hs.styledtext.new(gas, MONOSPACE), fn = function() hs.urlevent.openURL('https://etherscan.io/gastracker') end },
+    { title = hs.styledtext.new(string.format("%.05f", obj.eth_btc), MONOSPACE), fn = function() hs.urlevent.openURL('https://livdir.com/ethgaspricechart/') end },
   })
 end
 

@@ -1,3 +1,4 @@
+local FONT_NAME = 'SF Pro'
 local MINIMUM_REACHABLE_FLAG = 1
 local NIL_TRACE = {
   colo = nil,
@@ -14,7 +15,7 @@ local obj = {
 
 -- use logger.d("log message")
 local logger = hs.logger.new('NetWatcher', 'debug')
-menubar = hs.menubar.new()
+local menubar = hs.menubar.new()
 
 function obj:menubar_data()
   local trace = obj.prev_trace
@@ -47,7 +48,7 @@ function obj:render_menubar(menubar_data)
     text = hs.styledtext.new(
       menubar_data.canvas_text_1,
       {
-        font = { name = 'SF Pro', size = 16 },
+        font = { name = FONT_NAME, size = 16 },
         color = { alpha = (obj:has_ip() and 0.9) or LOW_ALPHA, white = 1 },
         paragraphStyle = { alignment = "center", lineBreak = "clip", maximumLineHeight = 17 }
       }
@@ -58,7 +59,7 @@ function obj:render_menubar(menubar_data)
     text = hs.styledtext.new(
       menubar_data.canvas_text_2,
       {
-        font = { name = 'SF Pro', size = 8 },
+        font = { name = FONT_NAME, size = 8 },
         color = { alpha = (obj:has_ip() and 0.6) or LOW_ALPHA, white = 1 },
         paragraphStyle = { alignment = "center", lineBreak = "clip", minimumLineHeight = 23 }
       }
