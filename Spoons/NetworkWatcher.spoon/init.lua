@@ -12,6 +12,7 @@ local obj = {
   use_dhcp_dns = true, -- prev nil to allow ext upgrade, now true because tailscale dns more or less overrides this
 }
 
+-- use logger.d("log message")
 local logger = hs.logger.new('NetWatcher', 'debug')
 menubar = hs.menubar.new()
 

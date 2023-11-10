@@ -1,5 +1,6 @@
 local obj = {}
 
+-- use logger.d("log message")
 local logger = hs.logger.new('CryptoMenu', 'debug')
 local menubar = hs.menubar.new()
 local monospace = { font = { name = 'SFMono-Regular', size = 12 } }
@@ -64,7 +65,6 @@ function obj:get_alpha()
 end
 
 function obj:refresh_data()
-  -- logger.d('refresh_data')
   hs.http.asyncGet(
     eth_price_url .. obj.config.etherscan_api_key,
     nil,

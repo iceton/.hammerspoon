@@ -2,6 +2,7 @@ local LOAD_MAX = 3
 
 local obj = {}
 
+-- use logger.d("log message")
 local logger = hs.logger.new('LoadAlert', 'debug')
 
 local function check_load()
@@ -9,7 +10,6 @@ local function check_load()
   local split = hs.fnutils.split(hs.execute('sysctl -n vm.loadavg'), ' ')
   local load1 = tonumber(split[2])
   local load5 = tonumber(split[3])
-  -- logger.d(load5)
   if (load1 > LOAD_MAX and load5 > LOAD_MAX) then
     local notification = hs.notify.new({
       title = "High load",
