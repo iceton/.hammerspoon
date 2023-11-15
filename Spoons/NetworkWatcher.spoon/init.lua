@@ -106,11 +106,7 @@ function obj:notify(trace)
     prev_trace.ip,
     trace.ip
   )
-  local notification = hs.notify.new({
-    title = string.format("%s connection", trace.loc),
-    informativeText = text,
-    withdrawAfter = 10
-  })
+  local withdrawAfter = 2
   if trace.loc ~= prev_trace.loc then
     local alert_text = string.format(
       "%s » %s",
@@ -118,8 +114,13 @@ function obj:notify(trace)
       trace.loc
     )
     hs.alert.show(alert_text, nil, nil, 3)
+    withdrawAfter = 10
   end
-  notification:send()
+  hs.notify.new({
+    title = string.format("%s connection", trace.loc),
+    informativeText = text,
+    withdrawAfter = withdrawAfter
+  }):send()
 end
 
 function obj:is_external_dns()
