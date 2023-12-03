@@ -9,7 +9,8 @@ local LOW_ALPHA = 0.3
 
 local obj = {
   prev_menubar_data = {},
-  prev_trace = NIL_TRACE,
+  prev_trace4 = NIL_TRACE,
+  prev_trace6 = NIL_TRACE,
   use_dhcp_dns = true, -- prev nil to allow ext upgrade, now true because tailscale dns more or less overrides this
 }
 
@@ -17,49 +18,64 @@ local obj = {
 local logger = hs.logger.new('NetWatcher', 'debug')
 local menubar = hs.menubar.new()
 
-function obj:menubar_data()
-  local trace = obj.prev_trace
-  menubar_data = {
-    canvas_text_1 = string.format("%s", trace.loc or '✕'),
-    canvas_text_2 = obj:is_external_dns() and 'EXT' or 'DHCP',
-    menu_1_ip = trace.ip,
-    menu_2_title = string.format("DNS %s", obj:get_dns_server()),
-    menu_3_checked = obj.use_dhcp_dns == true,
-  }
-  return menubar_data
-end
-
 function obj:update_menubar()
-  local menubar_data = obj:menubar_data()
+  local trace4 = obj.prev_trace4
+  local trace6 = obj.prev_trace6
+  -- table keys needed for encoding, fails as unkeyed arr
+  local menubar_data = {
+    t4c = trace4.colo,
+    t4i = trace4.ip,
+    t4l = trace4.loc,
+    t6c = trace6.colo,
+    t6i = trace6.ip,
+    t6l = trace6.loc,
+    ds = obj:get_dns_server(),
+    ud = obj.use_dhcp_dns
+  }
   -- rerender only if data has changed
   if hs.json.encode(menubar_data) ~= hs.json.encode(obj.prev_menubar_data) then
-    obj:render_menubar(menubar_data)
+    obj:render_menubar()
+    obj.prev_menubar_data = menubar_data
   end
 end
 
 function obj:has_ip()
-  return obj.prev_trace.ip ~= nil
+  return obj.prev_trace4.ip ~= nil
 end
 
-function obj:render_menubar(menubar_data)
+function obj:render_menubar()
   local rect = hs.geometry.rect(0, 0, 30, 22) -- 24 is max height
   local canvas = hs.canvas.new(rect)
+  local trace4 = obj.prev_trace4
+  local trace6 = obj.prev_trace6
+  local ip4 = trace4.ip
+  local ip6 = trace6.ip
+  local display_loc = (trace6.loc and trace4.loc ~= trace6.loc and '‼️') or trace4.loc or '✕'
+  local display_ip = ''
+  if ip4 and ip6 then
+    display_ip = '4 6'
+  elseif ip4 then
+    display_ip = '4'
+  elseif ip6 then
+    display_ip = '6'
+  end
   canvas[1] = {
     text = hs.styledtext.new(
-      menubar_data.canvas_text_1,
+      display_loc,
       {
-        font = { name = FONT_NAME, size = 16 },
+        font = { name = FONT_NAME, size = 14 },
         color = { alpha = (obj:has_ip() and 0.9) or LOW_ALPHA, white = 1 },
-        paragraphStyle = { alignment = "center", lineBreak = "clip", maximumLineHeight = 17 }
+        paragraphStyle = { alignment = "center", lineBreak = "clip", maximumLineHeight = 15 }
       }
     ),
     type = "text"
   }
   canvas[2] = {
     text = hs.styledtext.new(
-      menubar_data.canvas_text_2,
+      -- obj:is_external_dns() and 'EXT' or 'DHCP',
+      display_ip,
       {
-        font = { name = FONT_NAME, size = 8 },
+        font = { name = FONT_NAME, size = 10 },
         color = { alpha = (obj:has_ip() and 0.6) or LOW_ALPHA, white = 1 },
         paragraphStyle = { alignment = "center", lineBreak = "clip", minimumLineHeight = 23 }
       }
@@ -71,14 +87,12 @@ function obj:render_menubar(menubar_data)
   -- https://www.gitmemory.com/issue/Hammerspoon/hammerspoon/2741/792564885
   local canvas = nil
 
-  local ip = menubar_data.menu_1_ip
   menubar:setMenu({
-    { title = string.format("IP %s %s", ip, obj.prev_trace.colo), fn = function() hs.pasteboard.setContents(ip) end },
-    { title = menubar_data.menu_2_title, disabled = true },
-    { title = "Use DHCP DNS", checked = menubar_data.menu_3_checked, fn = function() obj:toggle_dhcp_dns() end },
+    { title = string.format("IP4 %s %s %s", trace4.loc, trace4.colo, ip4), fn = function() hs.pasteboard.setContents(ip4) end },
+    { title = string.format("IP6 %s %s %s", trace6.loc, trace6.colo, ip6), fn = function() hs.pasteboard.setContents(ip6) end },
+    { title = string.format("DNS %s", obj:get_dns_server()), disabled = true },
+    { title = "Use DHCP DNS", checked = obj.use_dhcp_dns == true, fn = function() obj:toggle_dhcp_dns() end },
   })
-  
-  obj.prev_menubar_data = menubar_data
 end
 
 function obj:get_dns_server()
@@ -95,29 +109,33 @@ function obj:toggle_dhcp_dns()
   obj:update_menubar()
 end
 
-function obj:notify(trace)
-  local prev_trace = obj.prev_trace
+function obj:notify(trace4, trace6)
+  local prev4 = obj.prev_trace4
+  local prev6 = obj.prev_trace6
+  local text = ''
   local text = string.format(
-    "%s %s » %s %s\n%s » %s",
-    prev_trace.loc,
-    prev_trace.colo,
-    trace.loc,
-    trace.colo,
-    prev_trace.ip,
-    trace.ip
+    "%s %s %s\n%s\n%s %s %s\n%s",
+    trace4.loc,
+    trace4.colo,
+    trace4.ip,
+    trace6.ip,
+    prev4.loc,
+    prev4.colo,
+    prev4.ip,
+    prev6.ip
   )
   local withdrawAfter = 2
-  if trace.loc ~= prev_trace.loc then
+  if trace4.loc ~= prev4.loc then
     local alert_text = string.format(
       "%s » %s",
-      prev_trace.loc,
-      trace.loc
+      prev4.loc,
+      trace4.loc
     )
     hs.alert.show(alert_text, nil, nil, 3)
     withdrawAfter = 10
   end
   hs.notify.new({
-    title = string.format("%s connection", trace.loc),
+    title = string.format("%s connection", trace4.loc),
     informativeText = text,
     withdrawAfter = withdrawAfter
   }):send()
@@ -193,28 +211,41 @@ function obj:is_ip_similar(str1, str2)
   return #t >= 4
 end
 
+function obj:trace_to_table(str)
+  local trace = {}
+  local lines = hs.fnutils.split(str, "\n")
+  for line_no, line in ipairs(lines) do
+    local kv = hs.fnutils.split(line, "=")
+    if (kv[1]) then trace[kv[1]] = kv[2] end
+  end
+  return trace
+end
+
 function obj:refresh_trace()
   -- use curl because asyncget sometimes uses a different route than the user
   hs.task.new(
     '/usr/bin/curl',
     function(exit_code, stdout, stderr)
-      local trace = {}
-      if exit_code == 0 then
-        local lines = hs.fnutils.split(stdout, "\n")
-        for line_no, line in ipairs(lines) do
-          local kv = hs.fnutils.split(line, "=")
-          if (kv[1]) then trace[kv[1]] = kv[2] end
-        end
-      else
-        trace = NIL_TRACE
+      local trace = (exit_code == 0 and obj:trace_to_table(stdout)) or NIL_TRACE
+      if not obj:is_ip_similar(trace.ip, obj.prev_trace4.ip) or trace.loc ~= obj.prev_trace4.loc then
+        obj:notify(trace, obj.prev_trace6)
       end
-      if not obj:is_ip_similar(trace.ip, obj.prev_trace.ip) or trace.loc ~= obj.prev_trace.loc then
-        obj:notify(trace)
-      end
-      obj.prev_trace = trace
+      obj.prev_trace4 = trace
       obj:update_menubar()
     end,
-    { '-f', 'https://cloudflare.com/cdn-cgi/trace' }
+    { '-4', '-f', 'https://cloudflare.com/cdn-cgi/trace' }
+  ):start()
+  hs.task.new(
+    '/usr/bin/curl',
+    function(exit_code, stdout, stderr)
+      local trace = (exit_code == 0 and obj:trace_to_table(stdout)) or NIL_TRACE
+      if not obj:is_ip_similar(trace.ip, obj.prev_trace6.ip) or trace.loc ~= obj.prev_trace6.loc then
+        obj:notify(obj.prev_trace4, trace)
+      end
+      obj.prev_trace6 = trace
+      obj:update_menubar()
+    end,
+    { '-6', '-f', 'https://cloudflare.com/cdn-cgi/trace' }
   ):start()
 end
 
