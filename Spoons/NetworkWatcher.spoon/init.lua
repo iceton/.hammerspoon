@@ -1,4 +1,3 @@
-local FONT_NAME = 'SF Pro'
 local MINIMUM_REACHABLE_FLAG = 1
 local NIL_TRACE = {
   colo = nil,
@@ -48,36 +47,14 @@ function obj:render_menubar()
   local canvas = hs.canvas.new(rect)
   local trace4 = obj.prev_trace4
   local trace6 = obj.prev_trace6
-  local ip4 = trace4.ip
-  local ip6 = trace6.ip
   local display_loc = (trace6.loc and trace4.loc ~= trace6.loc and '‼️') or trace4.loc or '✕'
-  local display_ip = ''
-  if ip4 and ip6 then
-    display_ip = '4 6'
-  elseif ip4 then
-    display_ip = '4'
-  elseif ip6 then
-    display_ip = '6'
-  end
   canvas[1] = {
     text = hs.styledtext.new(
       display_loc,
       {
-        font = { name = FONT_NAME, size = 14 },
+        font = { name = 'SF Compact Display', size = 20 },
         color = { alpha = (obj:has_ip() and 0.9) or LOW_ALPHA, white = 1 },
-        paragraphStyle = { alignment = "center", lineBreak = "clip", maximumLineHeight = 15 }
-      }
-    ),
-    type = "text"
-  }
-  canvas[2] = {
-    text = hs.styledtext.new(
-      -- obj:is_external_dns() and 'EXT' or 'DHCP',
-      display_ip,
-      {
-        font = { name = FONT_NAME, size = 10 },
-        color = { alpha = (obj:has_ip() and 0.6) or LOW_ALPHA, white = 1 },
-        paragraphStyle = { alignment = "center", lineBreak = "clip", minimumLineHeight = 23 }
+        paragraphStyle = { alignment = "center", lineBreak = "clip", maximumLineHeight = 22 }
       }
     ),
     type = "text"
@@ -87,9 +64,11 @@ function obj:render_menubar()
   -- https://www.gitmemory.com/issue/Hammerspoon/hammerspoon/2741/792564885
   local canvas = nil
 
+  local ip4 = trace4.ip
+  local ip6 = trace6.ip
   menubar:setMenu({
-    { title = string.format("IP4 %s %s %s", trace4.loc, trace4.colo, ip4), fn = function() hs.pasteboard.setContents(ip4) end },
-    { title = string.format("IP6 %s %s %s", trace6.loc, trace6.colo, ip6), fn = function() hs.pasteboard.setContents(ip6) end },
+    { title = string.format("%s %s %s", trace4.loc, trace4.colo, ip4), disabled = not ip4, fn = function() hs.pasteboard.setContents(ip4) end },
+    { title = string.format("%s %s %s", trace6.loc, trace6.colo, ip6), disabled = not ip6, fn = function() hs.pasteboard.setContents(ip6) end },
     { title = string.format("DNS %s", obj:get_dns_server()), disabled = true },
     { title = "Use DHCP DNS", checked = obj.use_dhcp_dns == true, fn = function() obj:toggle_dhcp_dns() end },
   })
@@ -112,33 +91,18 @@ end
 function obj:notify(trace4, trace6)
   local prev4 = obj.prev_trace4
   local prev6 = obj.prev_trace6
-  local text = ''
-  local text = string.format(
-    "%s %s %s\n%s\n%s %s %s\n%s",
-    trace4.loc,
-    trace4.colo,
-    trace4.ip,
-    trace6.ip,
-    prev4.loc,
-    prev4.colo,
-    prev4.ip,
-    prev6.ip
-  )
-  local withdrawAfter = 2
-  if trace4.loc ~= prev4.loc then
-    local alert_text = string.format(
-      "%s » %s",
-      prev4.loc,
-      trace4.loc
-    )
+  local loc = trace4.loc or trace6.loc
+  local prev_loc = prev4.loc or prev6.loc
+  if loc ~= prev_loc then
+    local alert_text = string.format("%s » %s", prev_loc, loc)
     hs.alert.show(alert_text, nil, nil, 3)
-    withdrawAfter = 10
+  else
+    hs.notify.new({
+      title = string.format("%s connection", loc),
+      informativeText = string.format("%s » %s", prev4.colo or prev6.colo, trace4.colo or trace6.colo),
+      withdrawAfter = 3
+    }):send()
   end
-  hs.notify.new({
-    title = string.format("%s connection", trace4.loc),
-    informativeText = text,
-    withdrawAfter = withdrawAfter
-  }):send()
 end
 
 function obj:is_external_dns()
