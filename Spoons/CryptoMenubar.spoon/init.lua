@@ -9,17 +9,14 @@ local menubar = hs.menubar.new()
 
 local eth_gas_url = 'https://api.etherscan.io/api?module=gastracker&action=gasoracle&apikey='
 local eth_price_url = 'https://api.etherscan.io/api?module=stats&action=ethprice&apikey='
-local ldo_url = 'https://api.coinmarketcap.com/data-api/v3/cryptocurrency/market-pairs/latest?slug=lido-dao&start=1&limit=1&category=spot'
 
 obj.btc_usd = 0
 obj.eth_btc = 0
 obj.eth_usd = 0
-obj.ldo_eth = 0
-obj.ldo_usd = 0
 obj.gas_low = 0
 obj.gas_med = 0
 obj.gas_hi = 0
-obj.fetch_times = { [eth_gas_url] = 0, [eth_price_url] = 0, [ldo_url] = 0 }
+obj.fetch_times = { [eth_gas_url] = 0, [eth_price_url] = 0 }
 
 function obj:update_menubar()
   local alpha = obj:get_alpha()
@@ -30,7 +27,7 @@ function obj:update_menubar()
     { font = { name = FONT_NAME, size = 9 }, color = { alpha = alpha, white = 1 }, paragraphStyle = { alignment = "left", lineBreak = "clip", maximumLineHeight = 12 } }
   )
   local canvas_text = getmetatable(st1).__concat(st1, hs.styledtext.new(
-    string.format("%.05f %s", obj.ldo_eth, obj.gas_med):sub(2),
+    string.format("%s %s", obj.gas_med, string.format("%.04f", obj.eth_btc):sub(2)),
     { font = { name = FONT_NAME, size = 9 }, color = { alpha = alpha, white = 1 }, paragraphStyle = { alignment = "left", lineBreak = "clip", maximumLineHeight = 10 } }
   ))
   canvas[1] = {
@@ -44,7 +41,6 @@ function obj:update_menubar()
   menubar:setMenu({
     { title = hs.styledtext.new(string.format("BTC% 9.02f", obj.btc_usd), MONOSPACE), fn = function() hs.urlevent.openURL('https://www.google.com/finance/quote/BTC-USD?window=5D') end },
     { title = hs.styledtext.new(string.format("ETH% 9.02f", obj.eth_usd), MONOSPACE), fn = function() hs.urlevent.openURL('https://www.google.com/finance/quote/ETH-USD?window=5D') end },
-    { title = hs.styledtext.new(string.format("LDO% 9.02f", obj.ldo_usd), MONOSPACE), fn = function() hs.urlevent.openURL('https://www.coingecko.com/en/coins/lido-dao') end },
     { title = '-' },
     { title = hs.styledtext.new(gas, MONOSPACE), fn = function() hs.urlevent.openURL('https://etherscan.io/gastracker') end },
     { title = hs.styledtext.new(string.format("%.05f", obj.eth_btc), MONOSPACE), fn = function() hs.urlevent.openURL('https://livdir.com/ethgaspricechart/') end },
@@ -91,21 +87,6 @@ function obj:refresh_data()
         obj.gas_med = body.result.ProposeGasPrice
         obj.gas_hi = body.result.FastGasPrice
         obj:update_fetch_time(eth_gas_url)
-        obj:update_menubar()
-      end
-    end
-  )
-  hs.http.asyncGet(
-    ldo_url,
-    nil,
-    function(status, body_json, headers)
-      if (status == 200) then
-        local body = hs.json.decode(body_json)
-        obj.ldo_usd = body.data.marketPairs[1].price
-        if obj.eth_usd then
-          obj.ldo_eth = obj.ldo_usd / obj.eth_usd
-        end
-        obj:update_fetch_time(ldo_url)
         obj:update_menubar()
       end
     end
