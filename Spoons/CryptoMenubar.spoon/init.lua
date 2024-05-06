@@ -1,25 +1,34 @@
+local ETH_GAS_URL = 'https://api.etherscan.io/api?module=gastracker&action=gasoracle&apikey='
+local ETH_PRICE_URL = 'https://api.etherscan.io/api?module=stats&action=ethprice&apikey='
 local FONT_NAME = 'SFMono-Regular'
 local MONOSPACE = { font = { name = FONT_NAME, size = 12 } }
-
-local obj = {}
 
 -- use logger.d("log message")
 local logger = hs.logger.new('CryptoMenu', 'debug')
 local menubar = hs.menubar.new()
 
-local eth_gas_url = 'https://api.etherscan.io/api?module=gastracker&action=gasoracle&apikey='
-local eth_price_url = 'https://api.etherscan.io/api?module=stats&action=ethprice&apikey='
-
+local obj = {}
 obj.btc_usd = 0
 obj.eth_btc = 0
 obj.eth_usd = 0
 obj.gas_low = 0
 obj.gas_med = 0
 obj.gas_hi = 0
-obj.fetch_times = { [eth_gas_url] = 0, [eth_price_url] = 0 }
+obj.fetch_times = { [ETH_GAS_URL] = 0, [ETH_PRICE_URL] = 0 }
 
-function obj:update_menubar()
-  local alpha = obj:get_alpha()
+-- make less opaque if earliest fetch time isn't recent
+local get_alpha = function ()
+  local now = hs.timer.secondsSinceEpoch()
+  local earliest = now
+  for _url, time in pairs(obj.fetch_times) do
+    if earliest > time then earliest = time end
+  end
+  local is_current = now - earliest < 60 * 10
+  return (is_current and 0.9) or 0.3
+end
+
+local update_menubar = function ()
+  local alpha = get_alpha()
   local rect = hs.geometry.rect(0, 0, 55, 22) -- 24 is max height
   local canvas = hs.canvas.new(rect)
   local st1 = hs.styledtext.new(
@@ -47,24 +56,13 @@ function obj:update_menubar()
   })
 end
 
-function obj:update_fetch_time(url)
+local update_fetch_time = function (url)
   obj.fetch_times[url] = hs.timer.secondsSinceEpoch()
 end
 
--- make less opaque if earliest fetch time isn't recent
-function obj:get_alpha()
-  local now = hs.timer.secondsSinceEpoch()
-  local earliest = now
-  for _url, time in pairs(obj.fetch_times) do
-    if earliest > time then earliest = time end
-  end
-  local is_current = now - earliest < 60 * 10
-  return (is_current and 0.9) or 0.3
-end
-
-function obj:refresh_data()
+local refresh_data = function ()
   hs.http.asyncGet(
-    eth_price_url .. obj.config.etherscan_api_key,
+    ETH_PRICE_URL .. obj.config.etherscan_api_key,
     nil,
     function(status, body_json, headers)
       if (status == 200) then
@@ -72,13 +70,13 @@ function obj:refresh_data()
         obj.eth_usd = body.result.ethusd or 0
         obj.eth_btc = body.result.ethbtc or 0
         obj.btc_usd = obj.eth_usd / obj.eth_btc
-        obj:update_fetch_time(eth_price_url)
-        obj:update_menubar()
+        update_fetch_time(ETH_PRICE_URL)
+        update_menubar()
       end
     end
   )
   hs.http.asyncGet(
-    eth_gas_url .. obj.config.etherscan_api_key,
+    ETH_GAS_URL .. obj.config.etherscan_api_key,
     nil,
     function(status, body_json, headers)
       if (status == 200) then
@@ -86,8 +84,8 @@ function obj:refresh_data()
         obj.gas_low = body.result.SafeGasPrice
         obj.gas_med = body.result.ProposeGasPrice
         obj.gas_hi = body.result.FastGasPrice
-        obj:update_fetch_time(eth_gas_url)
-        obj:update_menubar()
+        update_fetch_time(ETH_GAS_URL)
+        update_menubar()
       end
     end
   )
@@ -95,9 +93,9 @@ end
 
 function obj:start(config)
   obj.config = config
-  obj:update_menubar()
-  obj:refresh_data()
-  obj.crypto_timer = hs.timer.doEvery(10, obj.refresh_data)
+  update_menubar()
+  refresh_data()
+  obj.crypto_timer = hs.timer.doEvery(20, refresh_data)
 end
 
 return obj
