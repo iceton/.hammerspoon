@@ -1,15 +1,17 @@
 local MINIMUM_REACHABLE_FLAG = 1
 local NIL_TRACE = {
-  colo = nil,
-  ip = nil,
-  loc = nil,
+  colo4 = nil,
+  ip4 = nil,
+  loc4 = nil,
+  colo6 = nil,
+  ip6 = nil,
+  loc6 = nil,
 }
 local LOW_ALPHA = 0.3
 
 local obj = {
   prev_menubar_data = {},
-  prev_trace4 = NIL_TRACE,
-  prev_trace6 = NIL_TRACE,
+  prev_trace = NIL_TRACE,
 }
 
 -- use logger.d("log message")
@@ -17,18 +19,9 @@ local logger = hs.logger.new('NetWatcher', 'debug')
 local menubar = hs.menubar.new()
 
 function obj:update_menubar()
-  local trace4 = obj.prev_trace4
-  local trace6 = obj.prev_trace6
+  local menubar_data = hs.fnutils.copy(obj.prev_trace)
   -- table keys needed for encoding, fails as unkeyed arr
-  local menubar_data = {
-    t4c = trace4.colo,
-    t4i = trace4.ip,
-    t4l = trace4.loc,
-    t6c = trace6.colo,
-    t6i = trace6.ip,
-    t6l = trace6.loc,
-    ds = obj:get_dns_server(),
-  }
+  menubar_data.ds = obj:get_dns_server()
   -- rerender only if data has changed
   if hs.json.encode(menubar_data) ~= hs.json.encode(obj.prev_menubar_data) then
     obj:render_menubar(menubar_data)
@@ -37,14 +30,14 @@ function obj:update_menubar()
 end
 
 function obj:has_ip()
-  return obj.prev_trace4.ip ~= nil or obj.prev_trace6.ip ~= nil
+  return obj.prev_trace.ip4 ~= nil or obj.prev_trace.ip6 ~= nil
 end
 
 function obj:render_menubar(data)
   local rect = hs.geometry.rect(0, 0, 30, 22) -- 24 is max height
   local canvas = hs.canvas.new(rect)
-  local is_loc_mismatch = data.t4l and data.t6l and data.t4l ~= data.t6l
-  local display_loc = (is_loc_mismatch and '‼️') or data.t4l or data.t6l or '✕'
+  local is_loc_mismatch = data.loc4 and data.loc6 and data.loc4 ~= data.loc6
+  local display_loc = (is_loc_mismatch and '‼️') or data.loc4 or data.loc6 or '✕'
   canvas[1] = {
     text = hs.styledtext.new(
       display_loc,
@@ -62,8 +55,8 @@ function obj:render_menubar(data)
   canvas = nil
 
   menubar:setMenu({
-    { title = string.format("%s %s %s", data.t4l, data.t4c, data.t4i), disabled = not data.t4i, fn = function() hs.pasteboard.setContents(data.t4i) end },
-    { title = string.format("%s %s %s", data.t6l, data.t6c, data.t6i), disabled = not data.t6i, fn = function() hs.pasteboard.setContents(data.t6i) end },
+    { title = string.format("%s %s %s", data.loc4, data.colo4, data.ip4), disabled = not data.ip4, fn = function() hs.pasteboard.setContents(data.ip4) end },
+    { title = string.format("%s %s %s", data.loc6, data.colo6, data.ip6), disabled = not data.ip6, fn = function() hs.pasteboard.setContents(data.ip6) end },
     { title = string.format("DNS %s", data.ds), disabled = true },
   })
 end
@@ -82,17 +75,16 @@ end
 --   obj:update_menubar()
 -- end
 
-function obj:notify(trace4, trace6)
-  local prev4 = obj.prev_trace4
-  local prev6 = obj.prev_trace6
+function obj:notify(trace)
+  local prev = obj.prev_trace
   
-  if trace4.loc ~= prev4.loc or trace6.loc ~= prev6.loc then
-    local alert_text = string.format("4 6: %s %s » %s %s", prev4.loc, prev6.loc, trace4.loc, trace6.loc)
+  if trace.loc4 ~= prev.loc4 or trace.loc6 ~= prev.loc6 then
+    local alert_text = string.format("4 6: %s %s » %s %s", prev.loc4, prev.loc6, trace.loc4, trace.loc6)
     hs.alert.show(alert_text, nil, nil, 3)
-  elseif trace4.colo ~= prev4.colo or trace6.colo ~= prev6.colo or not obj:is_ip_similar(prev4.ip, trace4.ip) or not obj:is_ip_similar(prev6.ip, trace6.ip) then
+  elseif trace.colo4 ~= prev.colo4 or trace.colo6 ~= prev.colo6 or not obj:is_ip_similar(prev.ip4, trace.ip4) or not obj:is_ip_similar(prev.ip6, trace.ip6) then
     hs.notify.new({
-      title = string.format("%s connection", trace4.loc or trace6.loc),
-      informativeText = string.format("4: %s » %s\n6: %s » %s", prev4.colo, trace4.colo, prev6.colo, trace6.colo),
+      title = string.format("%s connection", trace.loc4 or trace.loc6),
+      informativeText = string.format("4: %s » %s\n6: %s » %s", prev.colo4, trace.colo4, prev.colo6, trace.colo6),
       withdrawAfter = 3
     }):send()
   end
@@ -184,13 +176,18 @@ function obj:refresh_trace4()
     '/usr/bin/curl',
     function(exit_code, stdout, stderr)
       local trace4 = (exit_code == 0 and obj:trace_to_table(stdout)) or NIL_TRACE
-      obj:refresh_trace6(trace4)
+      local trace = {
+        colo4 = trace4.colo,
+        ip4 = trace4.ip,
+        loc4 = trace4.loc,
+      }
+      obj:refresh_trace6(trace)
     end,
     { '-4', '-f', 'https://cloudflare.com/cdn-cgi/trace' }
   ):start()
 end
 
-function obj:refresh_trace6(trace4)
+function obj:refresh_trace6(trace)
   hs.task.new(
     '/usr/bin/curl',
     function(exit_code, stdout, stderr)
@@ -199,17 +196,15 @@ function obj:refresh_trace6(trace4)
       --   obj:notify(obj.prev_trace4, trace)
       -- end
       -- obj.prev_trace6 = trace
-      obj:notify(trace4, trace6)
-      obj:store_trace(trace4, trace6)
+      trace.colo6 = trace6.colo
+      trace.ip6 = trace6.ip
+      trace.loc6 = trace6.loc
+      obj:notify(trace)
+      obj.prev_trace = trace
       obj:update_menubar()
     end,
     { '-6', '-f', 'https://cloudflare.com/cdn-cgi/trace' }
   ):start()
-end
-
-function obj:store_trace(trace4, trace6)
-  obj.prev_trace4 = trace4
-  obj.prev_trace6 = trace6
 end
 
 function obj:reach_callback(reach_obj, flags)
