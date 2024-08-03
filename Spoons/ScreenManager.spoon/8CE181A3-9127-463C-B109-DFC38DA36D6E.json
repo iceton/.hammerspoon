@@ -1,11 +1,11 @@
 {
   "notes": [
-    "Tokyo Gigabyte 4k on timba20",
+    "Tokyo Gigabyte 4k on timba24 20240720",
     "const LEFT_THIRD = [0, 0, 1200, 1666];",
     "const CENTER_THIRD = [1201, 0, 1205, 1666];",
     "const RIGHT_THIRD = [2407, 0, 600, 1666];"
   ],
-  "A64862A7-CA43-57C5-0857-D6964E3302DB": {
+  "8CE181A3-9127-463C-B109-DFC38DA36D6E": {
     "Code": [1201, 0, 1205, 1666],
     "Google Chrome": [0, 0, 1200, 1666],
     "iTerm2": [2407, 0, 600, 1666]
