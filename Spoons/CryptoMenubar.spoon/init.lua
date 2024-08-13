@@ -36,7 +36,7 @@ local update_menubar = function ()
     { font = { name = FONT_NAME, size = 9 }, color = { alpha = alpha, white = 1 }, paragraphStyle = { alignment = "left", lineBreak = "clip", maximumLineHeight = 12 } }
   )
   local canvas_text = getmetatable(st1).__concat(st1, hs.styledtext.new(
-    string.format("%s %s", obj.gas_med, string.format("%.04f", obj.eth_btc):sub(2)),
+    string.format("%.0f %s", obj.gas_med, string.format("%.04f", obj.eth_btc):sub(2)),
     { font = { name = FONT_NAME, size = 9 }, color = { alpha = alpha, white = 1 }, paragraphStyle = { alignment = "left", lineBreak = "clip", maximumLineHeight = 10 } }
   ))
   canvas[1] = {
