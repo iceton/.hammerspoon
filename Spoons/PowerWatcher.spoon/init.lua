@@ -9,6 +9,9 @@ end
 
 function obj:start()
   obj.watcher = hs.caffeinate.watcher.new(function(event)
+    if hs.audiodevice.defaultOutputDevice():inUse() then
+      return
+    end
     if is_mute_event(event) then
       hs.audiodevice.defaultOutputDevice():setVolume(0)
     end

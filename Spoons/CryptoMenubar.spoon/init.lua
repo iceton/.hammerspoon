@@ -46,7 +46,7 @@ local update_menubar = function ()
   menubar:setIcon(canvas:imageFromCanvas())
   -- https://www.gitmemory.com/issue/Hammerspoon/hammerspoon/2741/792564885
   canvas = nil
-  local gas = string.format("%s %s %s", obj.gas_low, obj.gas_med, obj.gas_hi)
+  local gas = string.format("%.0f %.0f %.0f", obj.gas_low, obj.gas_med, obj.gas_hi)
   menubar:setMenu({
     { title = hs.styledtext.new(string.format("BTC% 9.02f", obj.btc_usd), MONOSPACE), fn = function() hs.urlevent.openURL('https://www.google.com/finance/quote/BTC-USD?window=5D') end },
     { title = hs.styledtext.new(string.format("ETH% 9.02f", obj.eth_usd), MONOSPACE), fn = function() hs.urlevent.openURL('https://www.google.com/finance/quote/ETH-USD?window=5D') end },
