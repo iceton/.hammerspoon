@@ -1,17 +1,19 @@
+local CF4 = '1.1.1.1'
+local CF6 = '2606:4700:4700::1111'
+local CURL4_ARGS = { '-4', '-f', '-m 3', 'https://cloudflare.com/cdn-cgi/trace' }
+local CURL6_ARGS = { '-6', '-f', '-m 3', 'https://cloudflare.com/cdn-cgi/trace' }
+local LOW_ALPHA = 0.3
 local MINIMUM_REACHABLE_FLAG = 1
 local NIL_TRACE = {
-  colo4 = nil,
-  ip4 = nil,
-  loc4 = nil,
-  colo6 = nil,
-  ip6 = nil,
-  loc6 = nil,
+  colo = nil,
+  ip = nil,
+  loc = nil,
 }
-local LOW_ALPHA = 0.3
 
 local obj = {
   prev_menubar_data = {},
-  prev_trace = NIL_TRACE,
+  prev_trace4 = NIL_TRACE,
+  prev_trace6 = NIL_TRACE,
 }
 
 -- use logger.d("log message")
@@ -19,8 +21,10 @@ local logger = hs.logger.new('NetWatcher', 'debug')
 local menubar = hs.menubar.new()
 
 function obj:update_menubar()
-  local menubar_data = hs.fnutils.copy(obj.prev_trace)
+  local menubar_data = {}
   -- table keys needed for encoding, fails as unkeyed arr
+  menubar_data.trace4 = hs.fnutils.copy(obj.prev_trace4)
+  menubar_data.trace6 = hs.fnutils.copy(obj.prev_trace6)
   menubar_data.ds = obj:get_dns_server()
   -- rerender only if data has changed
   if hs.json.encode(menubar_data) ~= hs.json.encode(obj.prev_menubar_data) then
@@ -30,14 +34,16 @@ function obj:update_menubar()
 end
 
 function obj:has_ip()
-  return obj.prev_trace.ip4 ~= nil or obj.prev_trace.ip6 ~= nil
+  return obj.prev_trace4.ip ~= nil or obj.prev_trace6.ip ~= nil
 end
 
 function obj:render_menubar(data)
   local rect = hs.geometry.rect(0, 0, 30, 22) -- 24 is max height
   local canvas = hs.canvas.new(rect)
-  local is_loc_mismatch = data.loc4 and data.loc6 and data.loc4 ~= data.loc6
-  local display_loc = (is_loc_mismatch and '‼️') or data.loc4 or data.loc6 or '✕'
+  local trace4 = data.trace4
+  local trace6 = data.trace6
+  local is_loc_mismatch = trace4.loc and trace6.loc and trace4.loc ~= trace6.loc
+  local display_loc = (is_loc_mismatch and '‼️') or trace4.loc or trace6.loc or '✕'
   canvas[1] = {
     text = hs.styledtext.new(
       display_loc,
@@ -55,8 +61,8 @@ function obj:render_menubar(data)
   canvas = nil
 
   menubar:setMenu({
-    { title = string.format("%s %s %s", data.loc4, data.colo4, data.ip4), disabled = not data.ip4, fn = function() hs.pasteboard.setContents(data.ip4) end },
-    { title = string.format("%s %s %s", data.loc6, data.colo6, data.ip6), disabled = not data.ip6, fn = function() hs.pasteboard.setContents(data.ip6) end },
+    { title = string.format("%s %s %s", trace4.loc, trace4.colo, trace4.ip), disabled = not trace4.ip, fn = function() hs.pasteboard.setContents(trace4.ip) end },
+    { title = string.format("%s %s %s", trace6.loc, trace6.colo, trace6.ip), disabled = not trace6.ip, fn = function() hs.pasteboard.setContents(trace6.ip) end },
     { title = string.format("DNS %s", data.ds), disabled = true },
   })
 end
@@ -65,25 +71,30 @@ function obj:get_dns_server()
   return hs.execute('scutil --dns | grep "nameserver\\[0\\]" | head -1 | sed "s/.*: \\(.*\\)/\\1/"')
 end
 
-function obj:notify(trace)
-  local prev = obj.prev_trace
+function obj:notify(trace4, trace6)
+  local prev4 = obj.prev_trace4
+  local prev6 = obj.prev_trace6
   
-  if trace.loc4 ~= prev.loc4 or trace.loc6 ~= prev.loc6 then
-    local alert_text = string.format("4 6: %s %s » %s %s", prev.loc4, prev.loc6, trace.loc4, trace.loc6)
+  if trace4.loc ~= prev4.loc or trace6.loc ~= prev6.loc then
+    local alert_text = string.format("4 6: %s %s » %s %s", prev4.loc, prev6.loc, trace4.loc, trace6.loc)
     hs.alert.show(alert_text, nil, nil, 3)
-  --elseif trace.colo4 ~= prev.colo4 or trace.colo6 ~= prev.colo6 or not obj:is_ip_similar(prev.ip4, trace.ip4) or not obj:is_ip_similar(prev.ip6, trace.ip6) then
-elseif not obj:is_ip_similar(prev.ip4, trace.ip4) or not obj:is_ip_similar(prev.ip6, trace.ip6) then
+  elseif not obj:is_ip_similar(prev4.ip, trace4.ip) or not obj:is_ip_similar(prev6.ip, trace6.ip) then
     hs.notify.new({
-      title = string.format("%s connection", trace.loc4 or trace.loc6),
-      informativeText = string.format("4: %s » %s\n6: %s » %s", prev.colo4, trace.colo4, prev.colo6, trace.colo6),
+      title = string.format("%s connection", trace4.loc or trace6.loc),
+      informativeText = string.format("4: %s » %s\n6: %s » %s", prev4.colo, trace4.colo, prev6.colo, trace6.colo),
       withdrawAfter = 3
     }):send()
   end
+
+  obj.prev_trace4 = trace4
+  obj.prev_trace6 = trace6
+  obj:update_menubar()
 end
 
-function obj:is_network_reachable(reach_status)
+function obj:is_reachable(addr)
   -- logger.d(reach_status)
-  return reach_status >= MINIMUM_REACHABLE_FLAG
+  local status = hs.network.reachability.forAddress(addr):status()
+  return status >= MINIMUM_REACHABLE_FLAG
 end
 
 -- compare first 4 parts of ip to ignore local ipv6 changes
@@ -112,52 +123,53 @@ function obj:trace_to_table(str)
   return trace
 end
 
--- pass from trace4 to trace6 then menu
-function obj:refresh_trace4()
+function obj:curl_trace(curl_args, callback)
   hs.task.new(
     '/usr/bin/curl',
     function(exit_code, stdout, stderr)
-      local trace4 = (exit_code == 0 and obj:trace_to_table(stdout)) or NIL_TRACE
-      local trace = {
-        colo4 = trace4.colo,
-        ip4 = trace4.ip,
-        loc4 = trace4.loc,
-      }
-      obj:refresh_trace6(trace)
+      local trace = (exit_code == 0 and obj:trace_to_table(stdout)) or NIL_TRACE
+      callback(trace)
     end,
-    { '-4', '-f', 'https://cloudflare.com/cdn-cgi/trace' }
+    curl_args
   ):start()
 end
 
-function obj:refresh_trace6(trace)
-  hs.task.new(
-    '/usr/bin/curl',
-    function(exit_code, stdout, stderr)
-      local trace6 = (exit_code == 0 and obj:trace_to_table(stdout)) or NIL_TRACE
-      trace.colo6 = trace6.colo
-      trace.ip6 = trace6.ip
-      trace.loc6 = trace6.loc
-      obj:notify(trace)
-      obj.prev_trace = trace
-      obj:update_menubar()
-    end,
-    { '-6', '-f', 'https://cloudflare.com/cdn-cgi/trace' }
-  ):start()
+-- pass from trace4 to trace6 then menu
+function obj:refresh_trace4()
+  if not obj:is_reachable(CF4) then
+    obj:refresh_trace6(NIL_TRACE)
+    return
+  end
+  obj:curl_trace(
+    CURL4_ARGS,
+    function(trace4)
+      obj:refresh_trace6(trace4)
+    end
+  )
+end
+
+function obj:refresh_trace6(trace4)
+  if not obj:is_reachable(CF6) then
+    obj:notify(trace4, NIL_TRACE)
+    return
+  end
+  obj:curl_trace(
+    CURL6_ARGS,
+    function(trace6)
+      obj:notify(trace4, trace6)
+    end
+  )
 end
 
 function obj:reach_callback(reach_obj, flags)
-  if obj:is_network_reachable(reach_obj) then
-    obj.trace_timer:start():fire()
-  else
-    obj.trace_timer:stop()
-  end
+  obj.trace_timer:fire()
 end
 
 function obj:start()
   obj.update_menubar()
   obj.trace_timer = hs.timer.new(10, obj.refresh_trace4)
+  obj.trace_timer:start():fire()
   obj.reach_listener = hs.network.reachability.internet():setCallback(obj.reach_callback):start()
-  obj:reach_callback(hs.network.reachability.internet():status())
 end
 
 return obj
