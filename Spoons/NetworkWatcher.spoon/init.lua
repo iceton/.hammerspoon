@@ -40,7 +40,7 @@ function obj:has_ip()
 end
 
 function obj:render_menubar(trace4, trace6, dns)
-  local rect = hs.geometry.rect(0, 0, 30, 22) -- 24 is max height
+  local rect = hs.geometry.rect(0, 0, 30, 16) -- 24 may be max height
   local canvas = hs.canvas.new(rect)
   local is_loc_mismatch = trace4.loc and trace6.loc and trace4.loc ~= trace6.loc
   local display_loc = (is_loc_mismatch and '‼️') or trace4.loc or trace6.loc or '✕'
@@ -48,9 +48,9 @@ function obj:render_menubar(trace4, trace6, dns)
     text = hs.styledtext.new(
       display_loc,
       {
-        font = { name = 'SF Compact Display', size = 20 },
+        font = { name = 'SF Pro Display', size = 20,  },
         color = { alpha = (obj:has_ip() and 0.9) or LOW_ALPHA, white = 1 },
-        paragraphStyle = { alignment = "center", lineBreak = "clip", maximumLineHeight = 22 }
+        paragraphStyle = { alignment = "center", lineBreak = "clip", maximumLineHeight = 20 }
       }
     ),
     type = "text"
@@ -72,6 +72,9 @@ function obj:get_dns_server()
 end
 
 function obj:notify(trace4, trace6, prev4, prev6)
+  if not obj:has_ip() then
+    obj.trace_timer:setNextTrigger(5)
+  end
   if trace4.loc ~= prev4.loc or trace6.loc ~= prev6.loc then
     local alert_text = string.format("4 6: %s %s » %s %s", prev4.loc, prev6.loc, trace4.loc, trace6.loc)
     hs.alert.show(alert_text, nil, nil, 3)
@@ -157,11 +160,11 @@ function obj:refresh_trace6(trace4)
 end
 
 function obj:reach_callback(reach_obj, flags)
-  obj.trace_timer:fire()
+  obj.trace_timer:setNextTrigger(0.1)
 end
 
 function obj:start()
-  obj.trace_timer = hs.timer.new(10, obj.refresh_trace4)
+  obj.trace_timer = hs.timer.new(60, obj.refresh_trace4)
   obj.trace_timer:start():fire()
   obj.reach_listener = hs.network.reachability.internet():setCallback(obj.reach_callback):start()
 end
