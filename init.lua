@@ -1,3 +1,12 @@
+LOW_ALPHA = 0.3
+MINIMUM_REACHABLE_FLAG = 1
+
+function is_reachable(addr)
+  addr = addr or '0.0.0.0'
+  local status = hs.network.reachability.forAddress(addr):status()
+  return status >= MINIMUM_REACHABLE_FLAG
+end
+
 -- store config values in ~/.hammerspoon/config.json
 local config = hs.json.read('config.json') or {}
 

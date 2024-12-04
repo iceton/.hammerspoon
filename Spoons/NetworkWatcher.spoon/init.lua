@@ -1,9 +1,7 @@
 local CF4 = '1.1.1.1'
 local CF6 = '2606:4700:4700::1111'
-local CURL4_ARGS = { '-4', '-f', '-m 3', 'https://cloudflare.com/cdn-cgi/trace' }
-local CURL6_ARGS = { '-6', '-f', '-m 3', 'https://cloudflare.com/cdn-cgi/trace' }
-local LOW_ALPHA = 0.3
-local MINIMUM_REACHABLE_FLAG = 1
+local CURL4_ARGS = { '-4', '-f', '-m 5', 'https://cloudflare.com/cdn-cgi/trace' }
+local CURL6_ARGS = { '-6', '-f', '-m 5', 'https://cloudflare.com/cdn-cgi/trace' }
 local NIL_TRACE = {
   colo = nil,
   ip = nil,
@@ -79,9 +77,16 @@ function obj:notify(trace4, trace6, prev4, prev6)
     local alert_text = string.format("4 6: %s %s » %s %s", prev4.loc, prev6.loc, trace4.loc, trace6.loc)
     hs.alert.show(alert_text, nil, nil, 3)
   elseif not obj:is_ip_similar(prev4.ip, trace4.ip) or not obj:is_ip_similar(prev6.ip, trace6.ip) then
+    local loc = (prev4.loc ~= trace4.loc or prev6.loc ~= trace6.loc) and ((trace4.loc or trace6.loc) or nil)
+    local title = (updated_loc and string.format("%s connection", loc)) or nil
+    local diff4 = (prev4.colo ~= trace4.colo and string.format("%s » %s", prev4.colo, trace4.colo)) or (prev4.ip ~= trace4.ip and string.format("%s » %s", prev4.ip, trace4.ip)) or nil
+    local diff6 = (prev6.colo ~= trace6.colo and string.format("%s » %s", prev6.colo, trace6.colo)) or (prev6.ip ~= trace6.ip and string.format("%s » %s", prev6.ip, trace6.ip)) or nil
+    local text = ""
+    if diff4 then text = text .. "4: " .. diff4 end
+    if diff6 then text = text .. "6: " .. diff6 end
     hs.notify.new({
-      title = string.format("%s connection", trace4.loc or trace6.loc),
-      informativeText = string.format("4: %s » %s\n6: %s » %s", prev4.colo, trace4.colo, prev6.colo, trace6.colo),
+      title = title,
+      informativeText = text,
       withdrawAfter = 3
     }):send()
   end
@@ -89,12 +94,6 @@ function obj:notify(trace4, trace6, prev4, prev6)
   obj.prev_trace4 = trace4
   obj.prev_trace6 = trace6
   obj:update_menubar(trace4, trace6)
-end
-
-function obj:is_reachable(addr)
-  -- logger.d(reach_status)
-  local status = hs.network.reachability.forAddress(addr):status()
-  return status >= MINIMUM_REACHABLE_FLAG
 end
 
 -- compare first 4 parts of ip to ignore local ipv6 changes
@@ -136,7 +135,7 @@ end
 
 -- pass from trace4 to trace6 then menu
 function obj:refresh_trace4()
-  if not obj:is_reachable(CF4) then
+  if not is_reachable(CF4) then
     return obj:refresh_trace6(NIL_TRACE)
   end
   obj:curl_trace(
@@ -148,7 +147,7 @@ function obj:refresh_trace4()
 end
 
 function obj:refresh_trace6(trace4)
-  if not obj:is_reachable(CF6) then
+  if not is_reachable(CF6) then
     return obj:notify(trace4, NIL_TRACE, obj.prev_trace4, obj.prev_trace6)
   end
   obj:curl_trace(
@@ -160,7 +159,7 @@ function obj:refresh_trace6(trace4)
 end
 
 function obj:reach_callback(reach_obj, flags)
-  obj.trace_timer:setNextTrigger(0.1)
+  obj.trace_timer:setNextTrigger(0.2)
 end
 
 function obj:start()

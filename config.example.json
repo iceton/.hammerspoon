@@ -1,5 +1,6 @@
 {
   "crypto_menubar": {
+    "coinmarketcap_api_key": "EXAMPLEKEY",
     "etherscan_api_key": "EXAMPLEKEY"
   }
 }

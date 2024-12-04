@@ -8,6 +8,7 @@ local logger = hs.logger.new('CryptoMenu', 'debug')
 local menubar = hs.menubar.new()
 
 local obj = {}
+obj.btc_eth = 0
 obj.btc_usd = 0
 obj.eth_btc = 0
 obj.eth_usd = 0
@@ -24,19 +25,19 @@ local get_alpha = function ()
     if earliest > time then earliest = time end
   end
   local is_current = now - earliest < 60 * 10
-  return (is_current and 0.9) or 0.3
+  return (is_current and 0.9) or LOW_ALPHA
 end
 
 local update_menubar = function ()
   local alpha = get_alpha()
-  local rect = hs.geometry.rect(0, 0, 55, 22) -- 24 is max height
+  local rect = hs.geometry.rect(0, 0, 50, 22) -- 24 is max height
   local canvas = hs.canvas.new(rect)
   local st1 = hs.styledtext.new(
-    string.format("%.0f %.0f\n", obj.eth_usd, obj.btc_usd),
+    string.format("%.0f %.0f\n", obj.btc_usd, obj.gas_med),
     { font = { name = FONT_NAME, size = 9 }, color = { alpha = alpha, white = 1 }, paragraphStyle = { alignment = "left", lineBreak = "clip", maximumLineHeight = 12 } }
   )
   local canvas_text = getmetatable(st1).__concat(st1, hs.styledtext.new(
-    string.format("%.0f %s", obj.gas_med, string.format("%.04f", obj.eth_btc):sub(2)),
+    string.format("%.0f %.1f", obj.eth_usd, obj.btc_eth),
     { font = { name = FONT_NAME, size = 9 }, color = { alpha = alpha, white = 1 }, paragraphStyle = { alignment = "left", lineBreak = "clip", maximumLineHeight = 10 } }
   ))
   canvas[1] = {
@@ -48,11 +49,12 @@ local update_menubar = function ()
   canvas = nil
   local gas = string.format("%.0f %.0f %.0f", obj.gas_low, obj.gas_med, obj.gas_hi)
   menubar:setMenu({
-    { title = hs.styledtext.new(string.format("BTC% 9.02f", obj.btc_usd), MONOSPACE), fn = function() hs.urlevent.openURL('https://www.google.com/finance/quote/BTC-USD?window=5D') end },
-    { title = hs.styledtext.new(string.format("ETH% 9.02f", obj.eth_usd), MONOSPACE), fn = function() hs.urlevent.openURL('https://www.google.com/finance/quote/ETH-USD?window=5D') end },
+    { title = hs.styledtext.new(string.format("BTC% 7.0f", obj.btc_usd), MONOSPACE), fn = function() hs.urlevent.openURL('https://www.google.com/finance/quote/BTC-USD?window=5D') end },
+    { title = hs.styledtext.new(string.format("ETH% 7.0f", obj.eth_usd), MONOSPACE), fn = function() hs.urlevent.openURL('https://www.google.com/finance/quote/ETH-USD?window=5D') end },
     { title = '-' },
     { title = hs.styledtext.new(gas, MONOSPACE), fn = function() hs.urlevent.openURL('https://etherscan.io/gastracker') end },
-    { title = hs.styledtext.new(string.format("%.05f", obj.eth_btc), MONOSPACE), fn = function() hs.urlevent.openURL('https://livdir.com/ethgaspricechart/') end },
+    { title = hs.styledtext.new(string.format("%.04f", obj.btc_eth), MONOSPACE), fn = function() hs.urlevent.openURL('https://www.google.com/finance/quote/BTC-ETH?window=1M') end },
+    { title = hs.styledtext.new(string.format("%.05f", obj.eth_btc), MONOSPACE), fn = function() hs.urlevent.openURL('https://www.google.com/finance/quote/ETH-BTC?window=1M') end },
   })
 end
 
@@ -61,14 +63,19 @@ local update_fetch_time = function (url)
 end
 
 local refresh_data = function ()
+  if not is_reachable() then
+    return update_menubar()
+  end
+
   hs.http.asyncGet(
     ETH_PRICE_URL .. obj.config.etherscan_api_key,
     nil,
     function(status, body_json, headers)
       if (status == 200) then
         local body = hs.json.decode(body_json)
-        obj.eth_usd = body.result.ethusd or 0
-        obj.eth_btc = body.result.ethbtc or 0
+        obj.eth_btc = body.result.ethbtc
+        obj.eth_usd = body.result.ethusd
+        obj.btc_eth = 1 / obj.eth_btc
         obj.btc_usd = obj.eth_usd / obj.eth_btc
         update_fetch_time(ETH_PRICE_URL)
         update_menubar()
@@ -94,8 +101,12 @@ end
 function obj:start(config)
   obj.config = config
   update_menubar()
-  refresh_data()
-  obj.crypto_timer = hs.timer.doEvery(20, refresh_data)
+  obj.timer = hs.timer.doEvery(60, refresh_data):fire()
+  obj.reach_listener = hs.network.reachability.internet():setCallback(
+    function ()
+      obj.timer:fire()
+    end
+  ):start()
 end
 
 return obj
