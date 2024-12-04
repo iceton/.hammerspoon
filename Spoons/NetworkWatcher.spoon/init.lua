@@ -72,6 +72,7 @@ end
 function obj:notify(trace4, trace6, prev4, prev6)
   if not obj:has_ip() then
     obj.trace_timer:setNextTrigger(5)
+    return
   end
   if trace4.loc ~= prev4.loc or trace6.loc ~= prev6.loc then
     local alert_text = string.format("4 6: %s %s » %s %s", prev4.loc, prev6.loc, trace4.loc, trace6.loc)
