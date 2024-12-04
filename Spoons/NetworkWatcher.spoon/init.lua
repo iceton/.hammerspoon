@@ -33,8 +33,10 @@ function obj:update_menubar(trace4, trace6)
   end
 end
 
-function obj:has_ip()
-  return obj.prev_trace4.ip ~= nil or obj.prev_trace6.ip ~= nil
+function obj:has_ip(trace4, trace6)
+  trace4 = trace4 or obj.prev_trace4
+  trace6 = trace6 or obj.prev_trace6
+  return trace4.ip ~= nil or trace6.ip ~= nil
 end
 
 function obj:render_menubar(trace4, trace6, dns)
@@ -47,7 +49,7 @@ function obj:render_menubar(trace4, trace6, dns)
       display_loc,
       {
         font = { name = 'SF Pro Display', size = 20,  },
-        color = { alpha = (obj:has_ip() and 0.9) or LOW_ALPHA, white = 1 },
+        color = { alpha = (obj:has_ip(trace4, trace6) and 0.9) or LOW_ALPHA, white = 1 },
         paragraphStyle = { alignment = "center", lineBreak = "clip", maximumLineHeight = 20 }
       }
     ),
@@ -70,11 +72,9 @@ function obj:get_dns_server()
 end
 
 function obj:notify(trace4, trace6, prev4, prev6)
-  if not obj:has_ip() then
+  if not obj:has_ip(trace4, trace6) then
     obj.trace_timer:setNextTrigger(5)
-    return
-  end
-  if trace4.loc ~= prev4.loc or trace6.loc ~= prev6.loc then
+  elseif trace4.loc ~= prev4.loc or trace6.loc ~= prev6.loc then
     local alert_text = string.format("4 6: %s %s » %s %s", prev4.loc, prev6.loc, trace4.loc, trace6.loc)
     hs.alert.show(alert_text, nil, nil, 3)
   elseif not obj:is_ip_similar(prev4.ip, trace4.ip) or not obj:is_ip_similar(prev6.ip, trace6.ip) then
