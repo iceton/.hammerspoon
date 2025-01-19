@@ -25,7 +25,7 @@ local get_alpha = function ()
     if earliest > time then earliest = time end
   end
   local is_current = now - earliest < 60 * 10
-  return (is_current and 0.9) or LOW_ALPHA
+  return (is_current and HIGH_ALPHA) or LOW_ALPHA
 end
 
 local update_menubar = function ()
@@ -33,11 +33,11 @@ local update_menubar = function ()
   local rect = hs.geometry.rect(0, 0, 50, 22) -- 24 is max height
   local canvas = hs.canvas.new(rect)
   local st1 = hs.styledtext.new(
-    string.format("%.0f %.0f\n", obj.btc_usd, obj.gas_med),
+    string.format("%.0f %.1f\n", obj.btc_usd / 100, obj.btc_eth),
     { font = { name = FONT_NAME, size = 9 }, color = { alpha = alpha, white = 1 }, paragraphStyle = { alignment = "left", lineBreak = "clip", maximumLineHeight = 12 } }
   )
   local canvas_text = getmetatable(st1).__concat(st1, hs.styledtext.new(
-    string.format("%.0f %.1f", obj.eth_usd, obj.btc_eth),
+    string.format("%.0f %.0f", obj.eth_usd,  obj.gas_med),
     { font = { name = FONT_NAME, size = 9 }, color = { alpha = alpha, white = 1 }, paragraphStyle = { alignment = "left", lineBreak = "clip", maximumLineHeight = 10 } }
   ))
   canvas[1] = {

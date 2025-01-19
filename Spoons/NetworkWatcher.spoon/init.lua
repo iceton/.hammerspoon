@@ -1,7 +1,7 @@
 local CF4 = '1.1.1.1'
 local CF6 = '2606:4700:4700::1111'
-local CURL4_ARGS = { '-4', '-f', '-m 5', 'https://cloudflare.com/cdn-cgi/trace' }
-local CURL6_ARGS = { '-6', '-f', '-m 5', 'https://cloudflare.com/cdn-cgi/trace' }
+local CURL4_ARGS = { '-4', '-f', '-m 10', 'https://cloudflare.com/cdn-cgi/trace' }
+local CURL6_ARGS = { '-6', '-f', '-m 10', 'https://cloudflare.com/cdn-cgi/trace' }
 local NIL_TRACE = {
   colo = nil,
   ip = nil,
@@ -49,7 +49,7 @@ function obj:render_menubar(trace4, trace6, dns)
       display_loc,
       {
         font = { name = 'SF Pro Display', size = 20,  },
-        color = { alpha = (obj:has_ip(trace4, trace6) and 0.9) or LOW_ALPHA, white = 1 },
+        color = { alpha = (obj:has_ip(trace4, trace6) and HIGH_ALPHA) or LOW_ALPHA, white = 1 },
         paragraphStyle = { alignment = "center", lineBreak = "clip", maximumLineHeight = 20 }
       }
     ),
@@ -72,28 +72,29 @@ function obj:get_dns_server()
 end
 
 function obj:notify(trace4, trace6, prev4, prev6)
-  if not obj:has_ip(trace4, trace6) then
+  if obj:has_ip(trace4, trace6) then
+    local is_loc_new = prev4.loc ~= trace4.loc or prev6.loc ~= trace6.loc
+    if is_loc_new then
+      local alert_text = string.format("4 6: %s %s » %s %s", prev4.loc, prev6.loc, trace4.loc, trace6.loc)
+      hs.alert.show(alert_text, nil, nil, 3)
+    elseif not obj:is_ip_similar(prev4.ip, trace4.ip) or not obj:is_ip_similar(prev6.ip, trace6.ip) then
+      local title = (is_loc_new and string.format("%s connection", trace4.loc or trace6.loc)) or nil
+      local diff4 = (prev4.colo ~= trace4.colo and string.format("%s » %s", prev4.colo, trace4.colo)) or (prev4.ip ~= trace4.ip and string.format("%s » %s", prev4.ip, trace4.ip)) or nil
+      local diff6 = (prev6.colo ~= trace6.colo and string.format("%s » %s", prev6.colo, trace6.colo)) or (prev6.ip ~= trace6.ip and string.format("%s » %s", prev6.ip, trace6.ip)) or nil
+      local text = ""
+      if diff4 then text = text .. "4: " .. diff4 end
+      if diff6 then text = text .. "6: " .. diff6 end
+      hs.notify.new({
+        title = title,
+        informativeText = text,
+        withdrawAfter = 3
+      }):send()
+    end
+    obj.prev_trace4 = trace4
+    obj.prev_trace6 = trace6
+  else
     obj.trace_timer:setNextTrigger(5)
-  elseif trace4.loc ~= prev4.loc or trace6.loc ~= prev6.loc then
-    local alert_text = string.format("4 6: %s %s » %s %s", prev4.loc, prev6.loc, trace4.loc, trace6.loc)
-    hs.alert.show(alert_text, nil, nil, 3)
-  elseif not obj:is_ip_similar(prev4.ip, trace4.ip) or not obj:is_ip_similar(prev6.ip, trace6.ip) then
-    local loc = (prev4.loc ~= trace4.loc or prev6.loc ~= trace6.loc) and ((trace4.loc or trace6.loc) or nil)
-    local title = (updated_loc and string.format("%s connection", loc)) or nil
-    local diff4 = (prev4.colo ~= trace4.colo and string.format("%s » %s", prev4.colo, trace4.colo)) or (prev4.ip ~= trace4.ip and string.format("%s » %s", prev4.ip, trace4.ip)) or nil
-    local diff6 = (prev6.colo ~= trace6.colo and string.format("%s » %s", prev6.colo, trace6.colo)) or (prev6.ip ~= trace6.ip and string.format("%s » %s", prev6.ip, trace6.ip)) or nil
-    local text = ""
-    if diff4 then text = text .. "4: " .. diff4 end
-    if diff6 then text = text .. "6: " .. diff6 end
-    hs.notify.new({
-      title = title,
-      informativeText = text,
-      withdrawAfter = 3
-    }):send()
   end
-
-  obj.prev_trace4 = trace4
-  obj.prev_trace6 = trace6
   obj:update_menubar(trace4, trace6)
 end
 
@@ -160,7 +161,7 @@ function obj:refresh_trace6(trace4)
 end
 
 function obj:reach_callback(reach_obj, flags)
-  obj.trace_timer:setNextTrigger(0.2)
+  obj.trace_timer:setNextTrigger(1)
 end
 
 function obj:start()

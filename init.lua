@@ -1,3 +1,6 @@
+-- Store timers on obj, otherwise I see them stop after ~3 min
+
+HIGH_ALPHA = 0.9
 LOW_ALPHA = 0.3
 MINIMUM_REACHABLE_FLAG = 1
 
@@ -24,5 +27,3 @@ spoon.LoadAlert:start()
 
 hs.spoons.use('PowerWatcher')
 spoon.PowerWatcher:start()
-
--- Store timers on obj, otherwise I see them stop after ~3 min

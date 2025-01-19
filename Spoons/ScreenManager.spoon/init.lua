@@ -46,6 +46,25 @@ function obj:screens_updated()
   if screen_config then obj:reposition_windows(screens, screen_config) end
 end
 
+function obj:show_plex()
+  hs.osascript.javascript([[
+    (function() {
+      var chrome = Application('Google Chrome');
+      chrome.activate();
+
+      for (win of chrome.windows()) {
+        var tabIndex =
+          win.tabs().findIndex(tab => tab.url().match(/app.plex.tv/));
+
+        if (tabIndex != -1) {
+          win.activeTabIndex = (tabIndex + 1);
+          win.index = 1;
+        }
+      }
+    })();
+  ]])
+end
+
 function obj:delayed_screens_updated()
   hs.timer.doAfter(2, obj.screens_updated)
 end
@@ -53,6 +72,7 @@ end
 function obj:start()
   obj:screens_updated()
   hs.screen.watcher.new(obj.delayed_screens_updated)
+  hs.hotkey.bind("alt cmd ctrl shift", "\\", "Plex", obj.show_plex)
   hs.hotkey.bind("alt cmd ctrl shift", "l", obj.lock_screen)
   hs.hotkey.bind("alt cmd ctrl shift", "m", "Repositioning windows", obj.screens_updated)
 end
