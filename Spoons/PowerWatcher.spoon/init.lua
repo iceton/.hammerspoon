@@ -1,7 +1,12 @@
+local ALPHA = 0.9
+local FONT_NAME = 'SFMono-Regular'
+
 local obj = {}
 
 -- use logger.d("log message")
 local logger = hs.logger.new('PowerWatch', 'debug')
+
+local menubar = hs.menubar.new()
 
 function obj:start()
   obj.watcher = hs.caffeinate.watcher.new(function(event)

@@ -1,4 +1,5 @@
-local LOAD_MAX = 3
+local LOAD_MAX = 5
+local LOAD_MAX_15 = 3
 
 local obj = {}
 
@@ -10,10 +11,11 @@ local function check_load()
   local split = hs.fnutils.split(hs.execute('sysctl -n vm.loadavg'), ' ')
   local load1 = tonumber(split[2])
   local load5 = tonumber(split[3])
-  if (load1 > LOAD_MAX and load5 > LOAD_MAX) then
+  local load15 = tonumber(split[4])
+  if ((load1 > LOAD_MAX and load5 > LOAD_MAX) or (load1 > LOAD_MAX_15 and load15 > LOAD_MAX_15)) then
     local notification = hs.notify.new({
       title = "High load",
-      informativeText = string.format("%s %s %s", load1, load5, split[4]),
+      informativeText = string.format("%s %s %s", load1, load5, load15),
       withdrawAfter = 10
     })
     notification:send()

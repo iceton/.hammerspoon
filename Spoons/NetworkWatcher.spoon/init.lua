@@ -64,6 +64,7 @@ function obj:render_menubar(trace4, trace6, dns)
     { title = string.format("%s %s %s", trace4.loc, trace4.colo, trace4.ip), disabled = not trace4.ip, fn = function() hs.pasteboard.setContents(trace4.ip) end },
     { title = string.format("%s %s %s", trace6.loc, trace6.colo, trace6.ip), disabled = not trace6.ip, fn = function() hs.pasteboard.setContents(trace6.ip) end },
     { title = string.format("DNS %s", dns), disabled = true },
+    { title = string.format("%.1f W", hs.battery.watts()), disabled = true },
   })
 end
 
