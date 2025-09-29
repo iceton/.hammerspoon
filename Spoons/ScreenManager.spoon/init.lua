@@ -14,7 +14,7 @@ function obj:reposition_windows(screens, all_screens_config)
       local screen_config = all_screens_config[screen:getUUID()]
       for name, coords in pairs(screen_config) do
         local app = hs.application.get(name)
-        if app then
+        if app and app.allWindows then
           hs.fnutils.each(
             app:allWindows(),
             function(window)

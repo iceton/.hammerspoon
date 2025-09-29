@@ -1,5 +1,5 @@
-local ETH_GAS_URL = 'https://api.etherscan.io/api?module=gastracker&action=gasoracle&apikey='
-local ETH_PRICE_URL = 'https://api.etherscan.io/api?module=stats&action=ethprice&apikey='
+local ETH_GAS_URL = 'https://api.etherscan.io/v2/api?chainid=1&module=gastracker&action=gasoracle&apikey='
+local ETH_PRICE_URL = 'https://api.etherscan.io/v2/api?chainid=1&module=stats&action=ethprice&apikey='
 local FONT_NAME = 'SFMono-Regular'
 local MONOSPACE = { font = { name = FONT_NAME, size = 12 } }
 
@@ -10,7 +10,7 @@ local menubar = hs.menubar.new()
 local obj = {}
 obj.btc_eth = 0
 obj.btc_usd = 0
-obj.eth_btc = 0
+obj.eth_btc = 1
 obj.eth_usd = 0
 obj.gas_low = 0
 obj.gas_med = 0
@@ -33,11 +33,11 @@ local update_menubar = function ()
   local rect = hs.geometry.rect(0, 0, 50, 22) -- 24 is max height
   local canvas = hs.canvas.new(rect)
   local st1 = hs.styledtext.new(
-    string.format("%.0f %.1f\n", obj.btc_usd / 100, obj.btc_eth),
+    string.format("%.0f %.1f\n", (obj.btc_usd or 0)/ 100, obj.btc_eth or 0),
     { font = { name = FONT_NAME, size = 9 }, color = { alpha = alpha, white = 1 }, paragraphStyle = { alignment = "left", lineBreak = "clip", maximumLineHeight = 12 } }
   )
   local canvas_text = getmetatable(st1).__concat(st1, hs.styledtext.new(
-    string.format("%.0f %.0f", obj.eth_usd,  obj.gas_med),
+    string.format("%.0f %.0f", obj.eth_usd or 0,  obj.gas_med or 0),
     { font = { name = FONT_NAME, size = 9 }, color = { alpha = alpha, white = 1 }, paragraphStyle = { alignment = "left", lineBreak = "clip", maximumLineHeight = 10 } }
   ))
   canvas[1] = {
@@ -47,14 +47,14 @@ local update_menubar = function ()
   menubar:setIcon(canvas:imageFromCanvas())
   -- https://www.gitmemory.com/issue/Hammerspoon/hammerspoon/2741/792564885
   canvas = nil
-  local gas = string.format("%.0f %.0f %.0f", obj.gas_low, obj.gas_med, obj.gas_hi)
+  local gas = string.format("%.0f %.0f %.0f", obj.gas_low or 0, obj.gas_med or 0, obj.gas_hi or 0)
   menubar:setMenu({
-    { title = hs.styledtext.new(string.format("BTC% 7.0f", obj.btc_usd), MONOSPACE), fn = function() hs.urlevent.openURL('https://www.google.com/finance/quote/BTC-USD?window=5D') end },
-    { title = hs.styledtext.new(string.format("ETH% 7.0f", obj.eth_usd), MONOSPACE), fn = function() hs.urlevent.openURL('https://www.google.com/finance/quote/ETH-USD?window=5D') end },
+    { title = hs.styledtext.new(string.format("BTC% 7.0f", obj.btc_usd or 0), MONOSPACE), fn = function() hs.urlevent.openURL('https://www.google.com/finance/quote/BTC-USD?window=5D') end },
+    { title = hs.styledtext.new(string.format("ETH% 7.0f", obj.eth_usd or 0), MONOSPACE), fn = function() hs.urlevent.openURL('https://www.google.com/finance/quote/ETH-USD?window=5D') end },
     { title = '-' },
     { title = hs.styledtext.new(gas, MONOSPACE), fn = function() hs.urlevent.openURL('https://etherscan.io/gastracker') end },
-    { title = hs.styledtext.new(string.format("%.04f", obj.btc_eth), MONOSPACE), fn = function() hs.urlevent.openURL('https://www.google.com/finance/quote/BTC-ETH?window=1M') end },
-    { title = hs.styledtext.new(string.format("%.05f", obj.eth_btc), MONOSPACE), fn = function() hs.urlevent.openURL('https://www.google.com/finance/quote/ETH-BTC?window=1M') end },
+    { title = hs.styledtext.new(string.format("%.04f", obj.btc_eth or 0), MONOSPACE), fn = function() hs.urlevent.openURL('https://www.google.com/finance/quote/BTC-ETH?window=1M') end },
+    { title = hs.styledtext.new(string.format("%.05f", obj.eth_btc or 0), MONOSPACE), fn = function() hs.urlevent.openURL('https://www.google.com/finance/quote/ETH-BTC?window=1M') end },
   })
 end
 
@@ -73,6 +73,7 @@ local refresh_data = function ()
     function(status, body_json, headers)
       if (status == 200) then
         local body = hs.json.decode(body_json)
+        if not body.result.ethbtc then return end
         obj.eth_btc = body.result.ethbtc
         obj.eth_usd = body.result.ethusd
         obj.btc_eth = 1 / obj.eth_btc
